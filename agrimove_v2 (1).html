@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AgriMove — Smart Agricultural Cart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{
+  --g1:#2d7a3a;--g2:#3a9e4a;--g3:#52c464;
+  --gl:#e8f8eb;--gl2:#d0f0d6;
+  --bg:#f4f9f4;--bg2:#edf6ee;--bg3:#e2f0e4;--card:#fff;
+  --border:#c6e0c9;--border2:#a8d0ac;
+  --text:#1e3a22;--text2:#4a7550;--text3:#8ab890;
+  --blue:#1a6eb5;--bluel:#e3f0fb;--blueb:#b3d4f0;
+  --red:#d94f4f;--amber:#c8860a;
+  --r:18px;--rsm:10px;
+  --sh:0 2px 12px rgba(45,122,58,.10);
+  --sh2:0 8px 32px rgba(45,122,58,.18);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;}
+
+/* ══ PAGE SYSTEM ══ */
+.page{position:fixed;inset:0;display:none;flex-direction:column;animation:pageIn .35s cubic-bezier(.4,0,.2,1);}
+.page.active{display:flex;}
+@keyframes pageIn{from{opacity:0;transform:translateX(40px);}to{opacity:1;transform:translateX(0);}}
+@keyframes pageBack{from{opacity:0;transform:translateX(-40px);}to{opacity:1;transform:translateX(0);}}
+.page.back-in{animation:pageBack .35s cubic-bezier(.4,0,.2,1);}
+
+/* ══ NAV BAR ══ */
+nav{height:64px;display:flex;align-items:center;padding:0 20px;gap:10px;background:var(--card);border-bottom:2px solid var(--border);flex-shrink:0;z-index:200;box-shadow:var(--sh);}
+.nav-logo-wrap{display:flex;align-items:center;gap:10px;}
+.nav-logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--g2),var(--g1));border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 3px 14px rgba(45,122,58,.35);}
+.nav-logo-badge{display:flex;flex-direction:column;}
+.nav-title{font-size:22px;font-weight:900;letter-spacing:-.8px;line-height:1;}
+.nav-title em{color:var(--g1);font-style:normal;}
+.nav-sub{font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.5px;text-transform:uppercase;}
+.nav-sp{flex:1;}
+.chip{display:flex;align-items:center;gap:6px;padding:6px 13px;border-radius:999px;border:1.5px solid var(--border2);background:var(--gl);font-size:11px;font-weight:700;color:var(--text2);}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--text3);}
+.dot.live{background:var(--g2);box-shadow:0 0 8px var(--g2);animation:blink 1.8s infinite;}
+.dot.dead{background:var(--red);}
+.dot.blue{background:var(--blue);box-shadow:0 0 8px var(--blue);animation:blink 1.8s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── NAV Toggle Controls ── */
+.nav-controls{display:flex;align-items:center;gap:8px;}
+.nav-btn{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;border:1.5px solid var(--border2);background:var(--bg2);font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;color:var(--text2);cursor:pointer;transition:all .15s;}
+.nav-btn:hover{border-color:var(--g2);color:var(--g1);background:var(--gl);}
+.nav-btn.voice-btn{border-color:var(--g2);background:linear-gradient(135deg,var(--g2),var(--g1));color:#fff;}
+.nav-btn.voice-btn.listening{background:linear-gradient(135deg,#d94f4f,#f87171);border-color:#d94f4f;animation:pulse-red 1.2s infinite;}
+@keyframes pulse-red{0%,100%{box-shadow:0 0 0 0 rgba(217,79,79,.4);}50%{box-shadow:0 0 0 8px rgba(217,79,79,.0);}}
+.lang-pills{display:flex;gap:3px;}
+.lp{padding:5px 10px;border-radius:7px;border:1.5px solid var(--border2);background:var(--bg2);color:var(--text2);font-family:'Nunito',sans-serif;font-size:11px;font-weight:800;cursor:pointer;transition:all .12s;}
+.lp:hover{border-color:var(--g1);color:var(--g1);}
+.lp.on{background:var(--g1);border-color:var(--g1);color:#fff;}
+
+/* ══ PAGE STEP PROGRESS ══ */
+.step-bar{display:flex;align-items:center;justify-content:center;gap:0;padding:14px 20px 10px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0;}
+.step-item{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:64px;}
+.step-circle{width:34px;height:34px;border-radius:50%;border:2.5px solid var(--border2);background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:var(--text3);transition:all .3s;}
+.step-circle.done{background:var(--g1);border-color:var(--g1);color:#fff;}
+.step-circle.active{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 0 0 4px rgba(26,110,181,.15);}
+.step-lbl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);}
+.step-lbl.active{color:var(--blue);}
+.step-lbl.done{color:var(--g1);}
+.step-line{flex:1;height:2px;background:var(--border);margin:0 4px;margin-top:-22px;transition:background .3s;}
+.step-line.done{background:var(--g1);}
+
+/* ══ PAGE 1 — SPLASH LOGO ══ */
+#page-splash{background:linear-gradient(160deg,#1e4024 0%,#2d7a3a 40%,#3a9e4a 100%);justify-content:center;align-items:center;gap:0;}
+.splash-bg{position:absolute;inset:0;overflow:hidden;}
+.splash-bg-circle{position:absolute;border-radius:50%;border:1px solid rgba(255,255,255,.06);}
+.splash-logo-wrap{display:flex;flex-direction:column;align-items:center;gap:28px;z-index:1;}
+.splash-icon-ring{width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.12);backdrop-filter:blur(10px);border:2px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;animation:float 3s ease-in-out infinite;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.splash-icon-inner{width:110px;height:110px;border-radius:50%;background:linear-gradient(135deg,rgba(255,255,255,.25),rgba(255,255,255,.1));display:flex;align-items:center;justify-content:center;font-size:56px;}
+@keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-12px);}}
+.splash-brand{text-align:center;color:#fff;}
+.splash-name{font-size:52px;font-weight:900;letter-spacing:-2px;line-height:1;}
+.splash-name em{color:#7ee88a;font-style:normal;}
+.splash-tagline{font-size:14px;opacity:.75;font-weight:600;margin-top:6px;letter-spacing:.5px;}
+.splash-version{font-size:11px;opacity:.45;font-weight:600;margin-top:4px;}
+.splash-enter-btn{display:flex;align-items:center;gap:10px;padding:18px 48px;background:rgba(255,255,255,.15);backdrop-filter:blur(12px);border:2px solid rgba(255,255,255,.3);border-radius:999px;color:#fff;font-family:'Nunito',sans-serif;font-size:18px;font-weight:800;cursor:pointer;transition:all .2s;letter-spacing:.2px;z-index:1;}
+.splash-enter-btn:hover{background:rgba(255,255,255,.25);transform:scale(1.04);box-shadow:0 8px 32px rgba(0,0,0,.2);}
+.splash-enter-btn span{font-size:20px;}
+.splash-hints{display:flex;gap:14px;z-index:1;}
+.splash-hint{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 18px;background:rgba(255,255,255,.1);border-radius:14px;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.8);}
+.splash-hint span{font-size:24px;}
+.splash-hint small{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;opacity:.7;}
+
+/* ══ PAGE 2 — ORDER CART ══ */
+#page-order{background:var(--bg);}
+.page-scroll{flex:1;overflow-y:auto;padding:20px;}
+.page-hd{font-size:22px;font-weight:900;color:var(--text);margin-bottom:4px;}
+.page-sub{font-size:13px;color:var(--text3);font-weight:600;margin-bottom:20px;}
+.card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);padding:18px;box-shadow:var(--sh);margin-bottom:16px;}
+.card-hd{font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:14px;display:flex;align-items:center;gap:7px;}
+.card-hd::after{content:'';flex:1;height:1px;background:var(--border);}
+.product-grid{display:flex;flex-direction:column;gap:10px;}
+.product-item{display:flex;align-items:center;gap:14px;padding:14px 16px;border:2px solid var(--border);border-radius:14px;cursor:pointer;transition:all .15s;background:var(--bg2);}
+.product-item:hover{border-color:var(--g2);background:var(--gl);}
+.product-item.selected{border-color:var(--g1);background:var(--gl2);box-shadow:0 0 0 3px rgba(58,158,74,.12);}
+.prod-icon{width:50px;height:50px;border-radius:12px;background:linear-gradient(135deg,var(--gl2),var(--gl));border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;}
+.prod-info{flex:1;}
+.prod-name{font-size:15px;font-weight:800;}
+.prod-desc{font-size:11px;color:var(--text3);font-weight:600;margin-top:2px;}
+.prod-price{font-size:15px;font-weight:800;color:var(--g1);}
+.prod-check{width:24px;height:24px;border-radius:50%;border:2px solid var(--border2);background:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;transition:all .15s;}
+.product-item.selected .prod-check{background:var(--g1);border-color:var(--g1);color:#fff;}
+.weight-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.wchip{padding:12px 8px;border-radius:10px;border:2px solid var(--border);background:var(--bg2);cursor:pointer;text-align:center;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;color:var(--text2);transition:all .15s;}
+.wchip:hover{border-color:var(--g2);background:var(--gl);}
+.wchip.sel{background:var(--g1);border-color:var(--g1);color:#fff;box-shadow:0 3px 10px rgba(45,122,58,.3);}
+.wchip small{display:block;font-size:10px;font-weight:600;margin-top:2px;opacity:.8;}
+.custom-wt{display:flex;align-items:center;gap:10px;margin-top:10px;padding:12px 14px;border:2px solid var(--border);border-radius:12px;background:var(--bg2);transition:border-color .15s;}
+.custom-wt:focus-within{border-color:var(--g2);}
+.custom-wt label{font-size:12px;font-weight:700;color:var(--text3);}
+.custom-wt input{flex:1;border:none;background:transparent;font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;color:var(--text);outline:none;}
+.custom-wt .unit{font-size:12px;font-weight:700;color:var(--text3);}
+.order-summary{background:linear-gradient(135deg,var(--gl),var(--gl2));border:2px solid var(--border2);border-radius:14px;padding:14px 16px;margin-top:14px;}
+.sum-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13px;}
+.sum-lbl{color:var(--text2);font-weight:600;}
+.sum-val{font-weight:800;}
+.sum-val.green{color:var(--g1);}
+.sum-div{height:1px;background:var(--border2);margin:4px 0;}
+.max-note{display:flex;align-items:center;gap:7px;padding:9px 12px;background:#fff9e6;border:1.5px solid #f0d080;border-radius:10px;font-size:11px;font-weight:700;color:var(--amber);margin-top:10px;}
+.page-footer{padding:16px 20px;background:var(--card);border-top:1.5px solid var(--border);flex-shrink:0;}
+.big-btn{width:100%;padding:17px;border-radius:15px;border:none;background:linear-gradient(135deg,var(--g3),var(--g1));color:#fff;font-family:'Nunito',sans-serif;font-size:16px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all .15s;box-shadow:0 6px 24px rgba(45,122,58,.4);letter-spacing:.3px;}
+.big-btn:hover{opacity:.92;transform:translateY(-2px);}
+.big-btn:active{transform:scale(.98);}
+.big-btn:disabled{background:var(--bg3);color:var(--text3);box-shadow:none;cursor:not-allowed;transform:none;}
+.big-btn.blue-btn{background:linear-gradient(135deg,#2a8fe0,var(--blue));}
+.big-btn.amber-btn{background:linear-gradient(135deg,#f59e0b,var(--amber));}
+
+/* ══ PAGE 3 — LOCATION CONNECT ══ */
+#page-location{background:var(--bg);}
+.location-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:24px;padding:20px;}
+.loc-icon-ring{width:130px;height:130px;border-radius:50%;background:linear-gradient(135deg,var(--bluel),#c5e0f5);border:3px solid var(--blueb);display:flex;align-items:center;justify-content:center;font-size:56px;box-shadow:0 10px 40px rgba(26,110,181,.2);animation:loc-pulse 2.5s ease-in-out infinite;}
+@keyframes loc-pulse{0%,100%{transform:scale(1);box-shadow:0 10px 40px rgba(26,110,181,.2);}50%{transform:scale(1.05);box-shadow:0 14px 56px rgba(26,110,181,.35);}}
+.loc-hero-title{font-size:26px;font-weight:900;text-align:center;color:var(--text);}
+.loc-hero-sub{font-size:14px;color:var(--text3);font-weight:600;text-align:center;max-width:300px;line-height:1.6;}
+.loc-status-card{width:100%;max-width:420px;background:var(--card);border:2px solid var(--border);border-radius:var(--r);padding:18px;box-shadow:var(--sh);}
+.loc-status-row{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bluel);border:1.5px solid var(--blueb);border-radius:999px;margin-bottom:14px;}
+.loc-status-dot{width:12px;height:12px;border-radius:50%;background:var(--blueb);flex-shrink:0;}
+.loc-status-dot.tracking{background:var(--blue);box-shadow:0 0 8px var(--blue);animation:blink 1.5s infinite;}
+.loc-status-dot.error{background:var(--red);}
+.loc-status-txt{font-size:13px;font-weight:700;color:var(--blue);}
+.loc-status-txt.error{color:var(--red);}
+.loc-coords{display:none;background:var(--bg2);border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-top:12px;}
+.loc-coords.show{display:block;}
+.loc-coord-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);}
+.loc-coord-row:last-child{border:none;}
+.lcc-lbl{font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.lcc-val{font-family:'DM Mono',monospace;font-size:12px;color:var(--blue);font-weight:500;}
+.esp32-status{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg2);border:1.5px solid var(--border);border-radius:12px;margin-top:12px;}
+.esp32-icon{font-size:22px;}
+.esp32-info{flex:1;}
+.esp32-label{font-size:12px;font-weight:800;color:var(--text);}
+.esp32-sub{font-size:11px;color:var(--text3);font-weight:600;margin-top:1px;}
+.conn-dot{width:10px;height:10px;border-radius:50%;background:var(--text3);flex-shrink:0;}
+.conn-dot.on{background:var(--g2);box-shadow:0 0 8px var(--g2);animation:blink 1.8s infinite;}
+.conn-dot.off{background:var(--red);}
+.loc-footer{padding:16px 20px;background:var(--card);border-top:1.5px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;gap:10px;}
+
+/* ══ PAGE 4 — TRACKING MAP ══ */
+#page-tracking{background:var(--bg);}
+.tracking-main{flex:1;position:relative;overflow:hidden;}
+#trackMap{width:100%;height:100%;}
+.map-hud{position:absolute;top:14px;left:14px;z-index:500;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+.hud-pill{background:rgba(255,255,255,.94);border:1.5px solid var(--border2);border-radius:10px;padding:8px 13px;backdrop-filter:blur(12px);box-shadow:var(--sh2);}
+.hud-pill.blue-pill{border-color:var(--blueb);}
+.hud-lbl{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);font-weight:700;margin-bottom:2px;}
+.hud-val{font-family:'DM Mono',monospace;font-size:12px;color:var(--g1);font-weight:500;}
+.hud-val.blue{color:var(--blue);}
+.map-legend{position:absolute;top:14px;right:14px;z-index:500;background:rgba(255,255,255,.94);border:1.5px solid var(--border2);border-radius:10px;padding:10px 13px;backdrop-filter:blur(12px);box-shadow:var(--sh2);}
+.leg-row{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:5px;}
+.leg-row:last-child{margin:0;}
+.leg-dot{width:12px;height:12px;border-radius:50%;border:2px solid #fff;flex-shrink:0;}
+.weight-chart-overlay{position:absolute;bottom:16px;left:16px;z-index:500;background:rgba(255,255,255,.94);border:1.5px solid var(--border2);border-radius:10px;padding:10px 13px;backdrop-filter:blur(12px);width:200px;}
+.wco-hd{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);font-weight:700;margin-bottom:6px;}
+#miniChart{display:flex;align-items:flex-end;gap:3px;height:36px;}
+.bar{flex:1;background:linear-gradient(180deg,var(--g3),var(--g1));border-radius:3px 3px 0 0;min-height:2px;transition:height .5s;}
+.tracking-sidebar{width:300px;flex-shrink:0;background:var(--bg2);border-left:2px solid var(--border);overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;}
+.tracking-layout{display:flex;flex:1;overflow:hidden;min-height:0;}
+
+/* ══ BOTTOM NAV ══ */
+.bottom-nav{display:flex;align-items:center;background:var(--card);border-top:2px solid var(--border);flex-shrink:0;z-index:300;}
+.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 4px 11px;cursor:pointer;transition:all .15s;border:none;background:transparent;font-family:'Nunito',sans-serif;}
+.bn-item:hover{background:var(--gl);}
+.bn-item.active-tab{background:var(--gl2);}
+.bn-icon{font-size:20px;line-height:1;}
+.bn-lbl{font-size:10px;font-weight:800;color:var(--text3);letter-spacing:.3px;}
+.bn-item.active-tab .bn-lbl{color:var(--g1);}
+.bn-item:hover .bn-lbl{color:var(--g1);}
+.tracking-panel-card{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:14px;box-shadow:var(--sh);}
+.tpc-hd{font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--text3);margin-bottom:10px;}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.metric-cell{background:var(--bg2);border:1.5px solid var(--border);border-radius:9px;padding:9px 10px;}
+.mc-lbl{font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--text3);}
+.mc-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--text);margin-top:2px;}
+.mc-val.blue{color:var(--blue);}
+.mc-val.green{color:var(--g1);}
+.mc-val.amber{color:var(--amber);}
+.gauge-mini{text-align:center;}
+.gmini-num{font-size:30px;font-weight:900;font-family:'DM Mono',monospace;}
+.gmini-unit{font-size:11px;color:var(--text2);font-weight:600;margin-top:2px;}
+.gbar-wrap{background:var(--bg3);border-radius:999px;height:9px;overflow:hidden;margin-top:10px;border:1.5px solid var(--border);}
+.gbar{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--g3),var(--g2));transition:width .9s cubic-bezier(.4,0,.2,1);}
+.ctrl-dpad{display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(3,56px);gap:6px;margin:0 auto;width:fit-content;}
+.db{width:56px;height:56px;border:1.5px solid var(--border2);border-radius:10px;background:var(--bg2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;font-size:9px;font-weight:700;color:var(--text2);transition:all .12s;font-family:'Nunito',sans-serif;user-select:none;}
+.db svg{width:18px;height:18px;stroke:var(--text2);stroke-width:2.2;fill:none;transition:stroke .12s;}
+.db:hover{border-color:var(--g2);background:var(--gl2);color:var(--g1);}
+.db:hover svg{stroke:var(--g1);}
+.db:active,.db.hit{background:var(--gl);border-color:var(--g1);transform:scale(.9);}
+.de{visibility:hidden;}
+.db-stop{background:rgba(217,79,79,.06)!important;border-color:rgba(217,79,79,.3)!important;}
+.db-stop svg{stroke:var(--red)!important;}
+.db-stop span{color:var(--red)!important;}
+.log-box{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px;max-height:120px;overflow-y:auto;}
+.lr{display:flex;gap:8px;align-items:baseline;font-size:11px;font-family:'DM Mono',monospace;padding:3px 0;border-bottom:1px solid var(--border);}
+.lr:last-child{border:none;}
+.lt{color:var(--text3);flex-shrink:0;}
+.lm{color:var(--text2);}
+.lm.c{color:var(--g1);}
+.lm.e{color:var(--red);}
+.lm.b{color:var(--blue);}
+
+/* ══ PAGE 5 — NAVIGATION ══ */
+#page-navigation{background:var(--bg);}
+.nav-page-content{flex:1;overflow-y:auto;padding:20px;}
+.autonav-hero{background:linear-gradient(135deg,#1e3a22,#2d7a3a);border-radius:var(--r);padding:20px 18px;color:#fff;margin-bottom:16px;display:flex;align-items:center;gap:14px;}
+.ah-icon{font-size:38px;background:rgba(255,255,255,.15);border-radius:14px;width:60px;height:60px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ah-info{flex:1;}
+.ah-title{font-size:20px;font-weight:900;margin-bottom:3px;}
+.ah-sub{font-size:12px;opacity:.8;font-weight:600;line-height:1.5;}
+.flow-row{display:flex;align-items:center;gap:4px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:12px 10px;margin-bottom:14px;flex-wrap:wrap;justify-content:center;}
+.flow-step{display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 10px;border-radius:9px;font-size:9px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#fff;min-width:58px;text-align:center;}
+.flow-step.blue{background:#1a6eb5;}
+.flow-step.amber{background:#c8860a;}
+.flow-step.teal{background:#0a8a72;}
+.flow-step.green{background:#2d7a3a;}
+.flow-step span{font-size:17px;}
+.flow-arrow{font-size:11px;color:var(--text3);flex-shrink:0;}
+.nav-status-row{display:flex;align-items:center;gap:9px;padding:10px 14px;background:var(--bg2);border:1.5px solid var(--border);border-radius:10px;margin-bottom:12px;}
+.nav-dot{width:10px;height:10px;border-radius:50%;background:var(--text3);flex-shrink:0;}
+.nav-dot.active{background:var(--amber);box-shadow:0 0 8px var(--amber);animation:blink 1.2s infinite;}
+.nav-dot.arrived{background:var(--g2);box-shadow:0 0 8px var(--g2);}
+.nav-status-txt{font-size:12px;font-weight:700;color:var(--text2);flex:1;}
+.nav-metrics-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
+.nav-metric{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;}
+.nm-lbl{font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--text3);}
+.nm-val{font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:var(--text);margin-top:3px;}
+.nm-val.blue{color:var(--blue);}
+.nm-val.amber{color:var(--amber);}
+.nm-val.green{color:var(--g1);}
+.prereq-note{display:flex;align-items:center;gap:7px;padding:9px 12px;background:#fff9e6;border:1.5px solid #f0d080;border-radius:10px;font-size:11px;font-weight:700;color:var(--amber);margin-bottom:12px;}
+.nav-log{background:var(--card);border:1.5px solid var(--border);border-radius:10px;padding:10px;max-height:100px;overflow-y:auto;margin-bottom:12px;}
+
+/* ══ PAGE 6 — DESTINATION REACHED ══ */
+#page-arrived{background:linear-gradient(160deg,#1e4024 0%,#2d7a3a 35%,#3a9e4a 100%);justify-content:center;align-items:center;}
+.arrived-wrap{display:flex;flex-direction:column;align-items:center;text-align:center;gap:28px;padding:24px;max-width:480px;z-index:1;}
+.arrived-icon-ring{width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.15);border:3px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:70px;animation:arrived-bounce .6s cubic-bezier(.4,0,.2,1);box-shadow:0 20px 60px rgba(0,0,0,.3);}
+@keyframes arrived-bounce{0%{transform:scale(0) rotate(-20deg);}70%{transform:scale(1.08);}100%{transform:scale(1);}}
+.arrived-title{font-size:38px;font-weight:900;color:#fff;letter-spacing:-1px;line-height:1.1;}
+.arrived-sub{font-size:16px;color:rgba(255,255,255,.8);font-weight:600;line-height:1.6;}
+.arrived-details{background:rgba(255,255,255,.12);backdrop-filter:blur(12px);border:2px solid rgba(255,255,255,.2);border-radius:18px;padding:18px 22px;width:100%;}
+.arr-det-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.1);}
+.arr-det-row:last-child{border:none;}
+.arr-det-lbl{font-size:12px;color:rgba(255,255,255,.65);font-weight:600;}
+.arr-det-val{font-size:13px;color:#fff;font-weight:800;font-family:'DM Mono',monospace;}
+.arrived-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+.confetti-piece{position:absolute;width:10px;height:10px;border-radius:2px;animation:confetti-fall linear infinite;}
+@keyframes confetti-fall{0%{transform:translateY(-20px) rotate(0deg);opacity:1;}100%{transform:translateY(110vh) rotate(720deg);opacity:0;}}
+.arrived-btns{display:flex;flex-direction:column;gap:12px;width:100%;}
+.arrived-btn{padding:16px;border-radius:14px;border:none;font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;cursor:pointer;transition:all .15s;}
+.arrived-btn.primary{background:#fff;color:var(--g1);}
+.arrived-btn.primary:hover{background:rgba(255,255,255,.9);}
+.arrived-btn.secondary{background:rgba(255,255,255,.15);color:#fff;border:2px solid rgba(255,255,255,.3);}
+.arrived-btn.secondary:hover{background:rgba(255,255,255,.22);}
+
+/* ══ VOICE ASSISTANT ══ */
+.va-fab{position:fixed;bottom:24px;right:24px;z-index:3000;width:58px;height:58px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--g2),var(--g1));color:#fff;font-size:24px;cursor:pointer;box-shadow:0 6px 28px rgba(45,122,58,.45);display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.va-fab:hover{transform:scale(1.08);}
+.va-fab.listening{background:linear-gradient(135deg,#d94f4f,#f87171);box-shadow:0 6px 28px rgba(217,79,79,.55);animation:va-pulse 1.2s infinite;}
+@keyframes va-pulse{0%,100%{box-shadow:0 6px 28px rgba(217,79,79,.55);}50%{box-shadow:0 6px 44px rgba(217,79,79,.9),0 0 0 14px rgba(217,79,79,.1);}}
+.va-panel{position:fixed;bottom:98px;right:24px;z-index:3000;width:310px;background:var(--card);border:2px solid var(--border);border-radius:20px;box-shadow:0 8px 40px rgba(45,122,58,.2);overflow:hidden;display:none;}
+.va-panel.open{display:block;animation:va-slide .25s cubic-bezier(.4,0,.2,1);}
+@keyframes va-slide{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
+.va-head{background:linear-gradient(135deg,var(--g2),var(--g1));padding:14px 16px 12px;color:#fff;display:flex;align-items:center;gap:10px;}
+.va-avatar{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.va-head-info{flex:1;}
+.va-head-name{font-size:14px;font-weight:800;}
+.va-head-status{font-size:11px;opacity:.85;font-weight:600;}
+.va-close{background:rgba(255,255,255,.2);border:none;color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;}
+.va-body{padding:13px 15px;}
+.va-lang-row{display:flex;gap:5px;margin-bottom:10px;}
+.va-lb{padding:5px 10px;border-radius:7px;border:1.5px solid var(--border2);background:var(--bg2);color:var(--text2);font-family:'Nunito',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all .12s;}
+.va-lb:hover{border-color:var(--g1);color:var(--g1);}
+.va-lb.on{background:var(--g1);border-color:var(--g1);color:#fff;}
+.va-wave{display:flex;align-items:center;justify-content:center;gap:3px;height:34px;margin-bottom:10px;}
+.va-bar{width:4px;background:var(--border2);border-radius:3px;height:6px;transition:height .12s;}
+.va-bar.active{background:var(--g2);}
+.va-transcript{min-height:38px;max-height:70px;overflow-y:auto;background:var(--bg2);border-radius:9px;padding:8px 12px;font-size:12px;color:var(--text);border:1.5px solid var(--border);margin-bottom:8px;line-height:1.5;}
+.va-transcript em{color:var(--text3);font-style:normal;}
+.va-result{background:var(--gl);border:1.5px solid var(--border2);border-radius:9px;padding:8px 12px;font-size:11px;color:var(--g1);font-weight:700;margin-bottom:8px;display:none;}
+.va-result.show{display:block;}
+.va-mic-btn{width:100%;padding:11px;border-radius:11px;border:none;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(135deg,var(--g2),var(--g1));color:#fff;box-shadow:0 4px 16px rgba(45,122,58,.3);transition:all .15s;margin-bottom:9px;}
+.va-mic-btn.active{background:linear-gradient(135deg,#d94f4f,#f87171);}
+.va-hints{display:flex;flex-wrap:wrap;gap:5px;}
+.va-hint{padding:4px 10px;border-radius:999px;background:var(--bg3);border:1.5px solid var(--border2);font-size:10px;font-weight:700;color:var(--text2);cursor:pointer;transition:all .12s;}
+.va-hint:hover{background:var(--gl2);border-color:var(--g2);color:var(--g1);}
+
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+@media(max-width:768px){
+  .tracking-sidebar{display:none;}
+  .splash-hints{gap:8px;}
+  .splash-hint{padding:10px 12px;}
+  nav{padding:0 12px;gap:6px;}
+  .nav-controls{gap:5px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- PAGE 1: SPLASH / LOGO                         -->
+<!-- ══════════════════════════════════════════════ -->
+<div class="page active" id="page-splash">
+  <div class="splash-bg">
+    <div class="splash-bg-circle" style="width:600px;height:600px;top:-200px;right:-200px;"></div>
+    <div class="splash-bg-circle" style="width:400px;height:400px;bottom:-100px;left:-150px;"></div>
+  </div>
+  <div class="arrived-confetti" id="splashConfetti"></div>
+  <div class="splash-logo-wrap">
+    <div class="splash-icon-ring">
+      <div class="splash-icon-inner">🌾</div>
+    </div>
+    <div class="splash-brand">
+      <div class="splash-name">Agri<em>Move</em></div>
+      <div class="splash-tagline">Smart Agricultural Cart System</div>
+      <div class="splash-version">v2.0 · ESP32 + GPS · Tamil Nadu</div>
+    </div>
+    <div class="splash-hints">
+      <div class="splash-hint"><span>🛒</span><small>Order Cart</small></div>
+      <div class="splash-hint"><span>📍</span><small>GPS Track</small></div>
+      <div class="splash-hint"><span>🧭</span><small>Auto-Nav</small></div>
+      <div class="splash-hint"><span>🎙️</span><small>Voice AI</small></div>
+    </div>
+    <button class="splash-enter-btn" onclick="goToPage('page-order')">
+      <span>🚜</span> Get Started
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- PAGE 2: ORDER CART                            -->
+<!-- ══════════════════════════════════════════════ -->
+<div class="page" id="page-order">
+  <!-- NAV -->
+  <nav>
+    <div class="nav-logo-wrap">
+      <div class="nav-logo-icon">🌾</div>
+      <div class="nav-logo-badge">
+        <div class="nav-title">Agri<em>Move</em></div>
+        <div class="nav-sub">Smart Cart</div>
+      </div>
+    </div>
+    <div class="nav-sp"></div>
+    <div class="nav-controls">
+      <div class="chip"><div class="dot" id="espDot2"></div><span id="espTxt2">ESP32…</span></div>
+      <button class="nav-btn voice-btn" id="vaNavBtn2" onclick="vaTogglePanel()">🎙️ Voice</button>
+      <div class="lang-pills">
+        <button class="lp on" onclick="setLang('en')">EN</button>
+        <button class="lp" onclick="setLang('ta')">தமிழ்</button>
+        <button class="lp" onclick="setLang('hi')">हि</button>
+      </div>
+    </div>
+  </nav>
+  <!-- STEP BAR -->
+  <div class="step-bar">
+    <div class="step-item"><div class="step-circle active">🛒</div><div class="step-lbl active">Order</div></div>
+    <div class="step-line" id="sl1"></div>
+    <div class="step-item"><div class="step-circle" id="sc2">📍</div><div class="step-lbl" id="slbl2">Location</div></div>
+    <div class="step-line" id="sl2"></div>
+    <div class="step-item"><div class="step-circle" id="sc3">🗺️</div><div class="step-lbl" id="slbl3">Track</div></div>
+    <div class="step-line" id="sl3"></div>
+    <div class="step-item"><div class="step-circle" id="sc4">🧭</div><div class="step-lbl" id="slbl4">Navigate</div></div>
+    <div class="step-line" id="sl4"></div>
+    <div class="step-item"><div class="step-circle" id="sc5">✅</div><div class="step-lbl" id="slbl5">Done</div></div>
+  </div>
+  <!-- CONTENT -->
+  <div class="page-scroll">
+    <div class="page-hd" id="t-order-hd">🛒 Place Your Order</div>
+    <div class="page-sub" id="t-order-sub">Select your crop product and quantity</div>
+
+    <div class="card">
+      <div class="card-hd">🌾 Select Product</div>
+      <div class="product-grid">
+        <div class="product-item" id="prod-rice" onclick="selectProduct('rice','🌾','Rice (Paddy)','Premium quality paddy rice','₹45/kg')">
+          <div class="prod-icon">🌾</div>
+          <div class="prod-info"><div class="prod-name">Rice (Paddy)</div><div class="prod-desc">Premium quality paddy rice</div></div>
+          <div class="prod-price">₹45/kg</div>
+          <div class="prod-check" id="check-rice">✓</div>
+        </div>
+        <div class="product-item" id="prod-wheat" onclick="selectProduct('wheat','🌿','Wheat','Fresh harvested wheat grain','₹38/kg')">
+          <div class="prod-icon">🌿</div>
+          <div class="prod-info"><div class="prod-name">Wheat</div><div class="prod-desc">Fresh harvested wheat grain</div></div>
+          <div class="prod-price">₹38/kg</div>
+          <div class="prod-check" id="check-wheat">✓</div>
+        </div>
+        <div class="product-item" id="prod-corn" onclick="selectProduct('corn','🌽','Corn (Maize)','Dry maize kernels','₹32/kg')">
+          <div class="prod-icon">🌽</div>
+          <div class="prod-info"><div class="prod-name">Corn (Maize)</div><div class="prod-desc">Dry maize kernels</div></div>
+          <div class="prod-price">₹32/kg</div>
+          <div class="prod-check" id="check-corn">✓</div>
+        </div>
+        <div class="product-item" id="prod-millet" onclick="selectProduct('millet','🪨','Millet','Organic finger millet','₹55/kg')">
+          <div class="prod-icon">🪨</div>
+          <div class="prod-info"><div class="prod-name">Millet</div><div class="prod-desc">Organic finger millet</div></div>
+          <div class="prod-price">₹55/kg</div>
+          <div class="prod-check" id="check-millet">✓</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd">⚖️ Select Weight</div>
+      <div class="weight-grid">
+        <div class="wchip" id="wc-100" onclick="selectWeight(100)">100 g<small>0.1 kg</small></div>
+        <div class="wchip" id="wc-200" onclick="selectWeight(200)">200 g<small>0.2 kg</small></div>
+        <div class="wchip" id="wc-250" onclick="selectWeight(250)">250 g<small>0.25 kg</small></div>
+        <div class="wchip" id="wc-500" onclick="selectWeight(500)">500 g<small>0.5 kg</small></div>
+        <div class="wchip" id="wc-750" onclick="selectWeight(750)">750 g<small>0.75 kg</small></div>
+        <div class="wchip" id="wc-1000" onclick="selectWeight(1000)">1000 g<small>1 kg ★</small></div>
+      </div>
+      <div class="custom-wt">
+        <label>Custom:</label>
+        <input type="number" id="customWeightInput" placeholder="Enter grams…" min="1" max="1000" oninput="onCustomWeight(this.value)" onkeydown="return event.key!=='-'"/>
+        <span class="unit">g</span>
+      </div>
+      <div class="max-note">⚠️ Maximum allowed weight is <strong>1 kg (1000 g)</strong> per order.</div>
+      <div class="order-summary">
+        <div class="sum-row"><span class="sum-lbl">Product</span><span class="sum-val" id="sum-product">—</span></div>
+        <div class="sum-row"><span class="sum-lbl">Weight</span><span class="sum-val" id="sum-weight">—</span></div>
+        <div class="sum-div"></div>
+        <div class="sum-row"><span class="sum-lbl">Price/kg</span><span class="sum-val" id="sum-pricepkg">—</span></div>
+        <div class="sum-row"><span class="sum-lbl" style="font-size:14px;font-weight:800;">Total</span><span class="sum-val green" id="sum-total" style="font-size:16px;">—</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="page-footer">
+    <button class="big-btn" id="placeOrderBtn" onclick="placeOrder()" disabled>🛒 Place Order & Continue →</button>
+  </div>
+  <div class="bottom-nav">
+    <button class="bn-item" onclick="goToPage('page-splash')"><div class="bn-icon">🏠</div><div class="bn-lbl">Home</div></button>
+    <button class="bn-item active-tab"><div class="bn-icon">🛒</div><div class="bn-lbl">Order</div></button>
+    <button class="bn-item" onclick="goToPage('page-location')"><div class="bn-icon">📍</div><div class="bn-lbl">Location</div></button>
+    <button class="bn-item" onclick="goToPage('page-tracking')"><div class="bn-icon">🗺️</div><div class="bn-lbl">Map</div></button>
+    <button class="bn-item" onclick="goToPage('page-navigation')"><div class="bn-icon">🧭</div><div class="bn-lbl">Navigate</div></button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- PAGE 3: LOCATION CONNECT                      -->
+<!-- ══════════════════════════════════════════════ -->
+<div class="page" id="page-location">
+  <nav>
+    <div class="nav-logo-wrap">
+      <div class="nav-logo-icon">🌾</div>
+      <div class="nav-logo-badge">
+        <div class="nav-title">Agri<em>Move</em></div>
+        <div class="nav-sub">Smart Cart</div>
+      </div>
+    </div>
+    <div class="nav-sp"></div>
+    <div class="nav-controls">
+      <div class="chip"><div class="dot" id="espDot3"></div><span id="espTxt3">ESP32…</span></div>
+      <button class="nav-btn voice-btn" onclick="vaTogglePanel()">🎙️ Voice</button>
+      <div class="lang-pills">
+        <button class="lp on" onclick="setLang('en')">EN</button>
+        <button class="lp" onclick="setLang('ta')">தமிழ்</button>
+        <button class="lp" onclick="setLang('hi')">हि</button>
+      </div>
+    </div>
+  </nav>
+  <div class="step-bar">
+    <div class="step-item"><div class="step-circle done">✓</div><div class="step-lbl done">Order</div></div>
+    <div class="step-line done"></div>
+    <div class="step-item"><div class="step-circle active">📍</div><div class="step-lbl active">Location</div></div>
+    <div class="step-line"></div>
+    <div class="step-item"><div class="step-circle">🗺️</div><div class="step-lbl">Track</div></div>
+    <div class="step-line"></div>
+    <div class="step-item"><div class="step-circle">🧭</div><div class="step-lbl">Navigate</div></div>
+    <div class="step-line"></div>
+    <div class="step-item"><div class="step-circle">✅</div><div class="step-lbl">Done</div></div>
+  </div>
+  <div class="location-hero">
+    <div class="loc-icon-ring" id="locIconRing">📍</div>
+    <div>
+      <div class="loc-hero-title" id="t-loc-title">Connect Your Location</div>
+      <div class="loc-hero-sub" id="t-loc-sub">Enable GPS so the cart can navigate to you automatically</div>
+    </div>
+    <div class="loc-status-card">
+      <div class="loc-status-row">
+        <div class="loc-status-dot" id="locStatusDot"></div>
+        <span class="loc-status-txt" id="locStatusTxt">Location not started</span>
+      </div>
+      <button class="big-btn blue-btn" id="locTrackBtn" onclick="toggleGPS()" style="margin-bottom:10px;">
+        <span id="locTrackIcon">📍</span>
+        <span id="t-locbtn">Start My Location</span>
+      </button>
+      <div class="loc-coords" id="locCoordsBox">
+        <div class="loc-coord-row"><span class="lcc-lbl">Latitude</span><span class="lcc-val" id="locLatVal">—</span></div>
+        <div class="loc-coord-row"><span class="lcc-lbl">Longitude</span><span class="lcc-val" id="locLngVal">—</span></div>
+        <div class="loc-coord-row"><span class="lcc-lbl">Accuracy</span><span class="lcc-val" id="locAccVal">—</span></div>
+      </div>
+      <div class="esp32-status">
+        <div class="esp32-icon">📡</div>
+        <div class="esp32-info">
+          <div class="esp32-label">ESP32 Cart Connection</div>
+          <div class="esp32-sub" id="esp32ConnSub">Connecting to cart…</div>
+        </div>
+        <div class="conn-dot" id="espConnDot"></div>
+      </div>
+    </div>
+  </div>
+  <div class="loc-footer">
+    <button class="big-btn" id="locNextBtn" onclick="goToPage('page-tracking')" disabled>🗺️ View Tracking Map →</button>
+    <button class="big-btn" onclick="goToPage('page-order')" style="background:var(--bg3);color:var(--text2);box-shadow:none;font-size:13px;padding:12px;">← Back to Order</button>
+  </div>
+  <div class="bottom-nav">
+    <button class="bn-item" onclick="goToPage('page-splash')"><div class="bn-icon">🏠</div><div class="bn-lbl">Home</div></button>
+    <button class="bn-item" onclick="goToPage('page-order')"><div class="bn-icon">🛒</div><div class="bn-lbl">Order</div></button>
+    <button class="bn-item active-tab"><div class="bn-icon">📍</div><div class="bn-lbl">Location</div></button>
+    <button class="bn-item" onclick="goToPage('page-tracking')"><div class="bn-icon">🗺️</div><div class="bn-lbl">Map</div></button>
+    <button class="bn-item" onclick="goToPage('page-navigation')"><div class="bn-icon">🧭</div><div class="bn-lbl">Navigate</div></button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- PAGE 4: TRACKING MAP                          -->
+<!-- ══════════════════════════════════════════════ -->
+<div class="page" id="page-tracking">
+  <nav>
+    <div class="nav-logo-wrap">
+      <div class="nav-logo-icon">🌾</div>
+      <div class="nav-logo-badge">
+        <div class="nav-title">Agri<em>Move</em></div>
+        <div class="nav-sub">Smart Cart</div>
+      </div>
+    </div>
+    <div class="nav-sp"></div>
+    <div class="nav-controls">
+      <div class="chip"><div class="dot" id="espDot4"></div><span id="espTxt4">ESP32…</span></div>
+      <div class="chip" id="gpsChip4" style="display:none;"><div class="dot blue"></div><span style="color:var(--blue);">GPS Live</span></div>
+      <button class="nav-btn voice-btn" onclick="vaTogglePanel()">🎙️ Voice</button>
+      <div class="lang-pills">
+        <button class="lp on" onclick="setLang('en')">EN</button>
+        <button class="lp" onclick="setLang('ta')">தமிழ்</button>
+        <button class="lp" onclick="setLang('hi')">हि</button>
+      </div>
+    </div>
+  </nav>
+  <div class="step-bar">
+    <div class="step-item"><div class="step-circle done">✓</div><div class="step-lbl done">Order</div></div>
+    <div class="step-line done"></div>
+    <div class="step-item"><div class="step-circle done">✓</div><div class="step-lbl done">Location</div></div>
+    <div class="step-line done"></div>
+    <div class="step-item"><div class="step-circle active">🗺️</div><div class="step-lbl active">Track</div></div>
+    <div class="step-line"></div>
+    <div class="step-item"><div class="step-circle">🧭</div><div class="step-lbl">Navigate</div></div>
+    <div class="step-line"></div>
+    <div class="step-item"><div class="step-circle">✅</div><div class="step-lbl">Done</div></div>
+  </div>
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <button class="bn-item" onclick="goToPage('page-splash')"><div class="bn-icon">🏠</div><div class="bn-lbl">Home</div></button>
+    <button class="bn-item" onclick="goToPage('page-order')"><div class="bn-icon">🛒</div><div class="bn-lbl">Order</div></button>
+    <button class="bn-item" onclick="goToPage('page-location')"><div class="bn-icon">📍</div><div class="bn-lbl">Location</div></button>
+    <button class="bn-item active-tab" onclick="goToPage('page-tracking')"><div class="bn-icon">🗺️</div><div class="bn-lbl">Map</div></button>
+    <button class="bn-item" onclick="goToPage('page-navigation')"><div class="bn-icon">🧭</div><div class="bn-lbl">Navigate</div></button>
+  </div>
+  <div class="tracking-layout">
+    <!-- MAP -->
+    <div class="tracking-main">
+      <div id="trackMap"></div>
+      <div class="map-hud">
+        <div class="hud-pill blue-pill" id="myLocHud4" style="display:none;">
+          <div class="hud-lbl">📱 My Location</div>
+          <div class="hud-val blue" id="hMyLoc4">—</div>
+        </div>
+        <div class="hud-pill">
+          <div class="hud-lbl">⚖️ Cart Weight</div>
+          <div class="hud-val" id="hWt4">0.00 g</div>
+        </div>
+        <div class="hud-pill" id="espGpsHud4" style="display:none;">
+          <div class="hud-lbl">🛰️ Cart GPS</div>
+          <div class="hud-val" id="hEspGps4">—</div>
+        </div>
+      </div>
+      <div class="map-legend">
+        <div class="leg-row"><div class="leg-dot" style="background:#1a6eb5;box-shadow:0 0 6px rgba(26,110,181,.7);"></div><span>My Location</span></div>
+        <div class="leg-row"><div class="leg-dot" style="background:#3a9e4a;box-shadow:0 0 6px rgba(58,158,74,.6);"></div><span>AgriCart</span></div>
+      </div>
+      <div class="weight-chart-overlay">
+        <div class="wco-hd">📊 Weight History</div>
+        <div id="miniChart"></div>
+      </div>
+      <button onclick="goToPage('page-navigation')" style="position:absolute;bottom:16px;right:16px;z-index:500;background:linear-gradient(135deg,var(--amber),#f59e0b);color:#fff;border:none;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;display:flex;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(200,134,10,.4);">🧭 Start Navigation →</button>
+    </div>
+    <!-- SIDEBAR -->
+    <div class="tracking-sidebar">
+      <div class="tracking-panel-card">
+        <div class="tpc-hd">⚖️ Live Weight</div>
+        <div class="gauge-mini">
+          <div class="gmini-num" id="gNum">0.00</div>
+          <div class="gmini-unit">grams</div>
+          <div class="gbar-wrap"><div class="gbar" id="gBar" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div class="tracking-panel-card">
+        <div class="tpc-hd">🛰️ Cart GPS (ESP32)</div>
+        <div class="metric-grid">
+          <div class="metric-cell"><div class="mc-lbl">Lat</div><div class="mc-val blue" id="espLatVal4">—</div></div>
+          <div class="metric-cell"><div class="mc-lbl">Lng</div><div class="mc-val blue" id="espLngVal4">—</div></div>
+          <div class="metric-cell"><div class="mc-lbl">GPS Fix</div><div class="mc-val green" id="espGpsValid4">—</div></div>
+          <div class="metric-cell"><div class="mc-lbl">Status</div><div class="mc-val" id="espCartStatus4">—</div></div>
+        </div>
+      </div>
+      <div class="tracking-panel-card">
+        <div class="tpc-hd">🚜 Motor Controls</div>
+        <div class="ctrl-dpad">
+          <div class="db de"></div>
+          <div class="db" id="btn-forward" onclick="cmd('forward')"><svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg><span id="t-fwd">Fwd</span></div>
+          <div class="db de"></div>
+          <div class="db" id="btn-left" onclick="cmd('left')"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg><span id="t-left">Left</span></div>
+          <div class="db db-stop" id="btn-stop" onclick="cmd('stop')"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></svg><span id="t-stop" style="color:var(--red)">Stop</span></div>
+          <div class="db" id="btn-right" onclick="cmd('right')"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg><span id="t-right">Right</span></div>
+          <div class="db de"></div>
+          <div class="db" id="btn-backward" onclick="cmd('backward')"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg><span id="t-bwd">Back</span></div>
+          <div class="db de"></div>
+        </div>
+      </div>
+      <div class="tracking-panel-card" style="flex:1;">
+        <div class="tpc-hd">📋 Activity Log</div>
+        <div class="log-box" id="logBox"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- PAGE 5: NAVIGATION                            -->
+<!-- ══════════════════════════════════════════════ -->
+<div class="page" id="page-navigation">
+  <nav>
+    <div class="nav-logo-wrap">
+      <div class="nav-logo-icon">🌾</div>
+      <div class="nav-logo-badge">
+        <div class="nav-title">Agri<em>Move</em></div>
+        <div class="nav-sub">Smart Cart</div>
+      </div>
+    </div>
+    <div class="nav-sp"></div>
+    <div class="nav-controls">
+      <div class="chip"><div class="dot" id="espDot5"></div><span id="espTxt5">ESP32…</span></div>
+      <button class="nav-btn voice-btn" onclick="vaTogglePanel()">🎙️ Voice</button>
+      <div class="lang-pills">
+        <button class="lp on" onclick="setLang('en')">EN</button>
+        <button class="lp" onclick="setLang('ta')">தமிழ்</button>
+        <button class="lp" onclick="setLang('hi')">हि</button>
+      </div>
+    </div>
+  </nav>
+  <div class="step-bar">
+    <div class="step-item"><div class="step-circle done">✓</div><div class="step-lbl done">Order</div></div>
+    <div class="step-line done"></div>
+    <div class="step-item"><div class="step-circle done">✓</div><div class="step-lbl done">Location</div></div>
+    <div class="step-line done"></div>
+    <div class="step-item"><div class="step-circle done">✓</div><div class="step-lbl done">Track</div></div>
+    <div class="step-line done"></div>
+    <div class="step-item"><div class="step-circle active">🧭</div><div class="step-lbl active">Navigate</div></div>
+    <div class="step-line"></div>
+    <div class="step-item"><div class="step-circle">✅</div><div class="step-lbl">Done</div></div>
+  </div>
+  <div class="nav-page-content">
+    <div class="autonav-hero">
+      <div class="ah-icon">🧭</div>
+      <div class="ah-info">
+        <div class="ah-title">Auto-Navigation</div>
+        <div class="ah-sub">Cart follows your GPS automatically using bearing calculation and motor steering.</div>
+      </div>
+    </div>
+    <div class="flow-row">
+      <div class="flow-step blue"><span>📱</span>Phone GPS</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step amber"><span>📐</span>Bearing</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step teal"><span>⚙️</span>Steer</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step green"><span>✅</span>Arrive</div>
+    </div>
+    <div class="prereq-note" id="navPrereq">⚠️ Start Phone GPS and ensure ESP32 is connected first</div>
+    <div class="nav-status-row">
+      <div class="nav-dot" id="navDot"></div>
+      <span class="nav-status-txt" id="navStatusTxt">Auto-nav idle — press Start to begin</span>
+    </div>
+    <div class="nav-metrics-grid">
+      <div class="nav-metric"><div class="nm-lbl">Distance</div><div class="nm-val blue" id="navDistance">— m</div></div>
+      <div class="nav-metric"><div class="nm-lbl">Bearing</div><div class="nm-val amber" id="navBearing">—°</div></div>
+      <div class="nav-metric"><div class="nm-lbl">Direction</div><div class="nm-val" id="navDirection">—</div></div>
+      <div class="nav-metric"><div class="nm-lbl">Loops</div><div class="nm-val green" id="navLoops">0</div></div>
+    </div>
+    <div class="nav-log" id="navLogBox"></div>
+    <button class="big-btn amber-btn" id="navBtn" onclick="toggleAutoNav()" style="margin-bottom:12px;">🧭 Start Auto-Navigation</button>
+    <button class="big-btn" onclick="goToPage('page-tracking')" style="background:var(--bg3);color:var(--text2);box-shadow:none;font-size:13px;">← Back to Map</button>
+  </div>
+  <div class="bottom-nav">
+    <button class="bn-item" onclick="goToPage('page-splash')"><div class="bn-icon">🏠</div><div class="bn-lbl">Home</div></button>
+    <button class="bn-item" onclick="goToPage('page-order')"><div class="bn-icon">🛒</div><div class="bn-lbl">Order</div></button>
+    <button class="bn-item" onclick="goToPage('page-location')"><div class="bn-icon">📍</div><div class="bn-lbl">Location</div></button>
+    <button class="bn-item" onclick="goToPage('page-tracking')"><div class="bn-icon">🗺️</div><div class="bn-lbl">Map</div></button>
+    <button class="bn-item active-tab"><div class="bn-icon">🧭</div><div class="bn-lbl">Navigate</div></button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ -->
+<!-- PAGE 6: DESTINATION REACHED                   -->
+<!-- ══════════════════════════════════════════════ -->
+<div class="page" id="page-arrived">
+  <div class="arrived-confetti" id="arrivedConfetti"></div>
+  <div class="arrived-wrap">
+    <div class="arrived-icon-ring">🎉</div>
+    <div>
+      <div class="arrived-title">Cart Reached<br>Destination!</div>
+      <div class="arrived-sub">The AgriMove cart has successfully arrived at your location and stopped automatically.</div>
+    </div>
+    <div class="arrived-details">
+      <div class="arr-det-row"><span class="arr-det-lbl">Product</span><span class="arr-det-val" id="arr-product">—</span></div>
+      <div class="arr-det-row"><span class="arr-det-lbl">Weight</span><span class="arr-det-val" id="arr-weight">—</span></div>
+      <div class="arr-det-row"><span class="arr-det-lbl">Distance Covered</span><span class="arr-det-val" id="arr-distance">—</span></div>
+      <div class="arr-det-row"><span class="arr-det-lbl">Navigation Loops</span><span class="arr-det-val" id="arr-loops">—</span></div>
+      <div class="arr-det-row"><span class="arr-det-lbl">Final Accuracy</span><span class="arr-det-val" id="arr-accuracy">—</span></div>
+    </div>
+    <div class="arrived-btns">
+      <button class="arrived-btn primary" onclick="startNewOrder()">🛒 Place New Order</button>
+      <button class="arrived-btn secondary" onclick="goToPage('page-tracking')">🗺️ Back to Map</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ VOICE ASSISTANT PANEL ══ -->
+<div class="va-panel" id="vaPanel">
+  <div class="va-head">
+    <div class="va-avatar">🤖</div>
+    <div class="va-head-info">
+      <div class="va-head-name">AgriBot Voice</div>
+      <div class="va-head-status" id="vaHeadStatus">Ready — tap mic to speak</div>
+    </div>
+    <button class="va-close" onclick="vaTogglePanel()">✕</button>
+  </div>
+  <div class="va-body">
+    <div class="va-lang-row">
+      <button class="va-lb on" onclick="vaSetLang('en-IN')">EN</button>
+      <button class="va-lb" onclick="vaSetLang('ta-IN')">தமிழ்</button>
+      <button class="va-lb" onclick="vaSetLang('hi-IN')">हिंदी</button>
+    </div>
+    <div class="va-wave" id="vaWave">
+      <div class="va-bar" id="vb0"></div><div class="va-bar" id="vb1"></div>
+      <div class="va-bar" id="vb2"></div><div class="va-bar" id="vb3"></div>
+      <div class="va-bar" id="vb4"></div><div class="va-bar" id="vb5"></div>
+      <div class="va-bar" id="vb6"></div><div class="va-bar" id="vb7"></div>
+      <div class="va-bar" id="vb8"></div><div class="va-bar" id="vb9"></div>
+      <div class="va-bar" id="vb10"></div><div class="va-bar" id="vb11"></div>
+    </div>
+    <div class="va-transcript" id="vaTranscript"><em>Say a command…</em></div>
+    <div class="va-result" id="vaResult"></div>
+    <button class="va-mic-btn" id="vaMicBtn" onclick="vaToggleMic()">
+      🎙️ <span id="vaMicTxt">Hold &amp; Speak</span>
+    </button>
+    <div class="va-hints" id="vaHints"></div>
+  </div>
+</div>
+<button class="va-fab" id="vaFab" onclick="vaToggleMic()" title="Voice Command">🎙️</button>
+
+<script>
+// ════════════════════════════════════════════════
+// ⚙️  CONFIG
+// ════════════════════════════════════════════════
+const ESP = 'http://10.174.199.6';
+const MAX_WT = 5000;
+const ARRIVED_THRESHOLD_M = 2.0;
+
+// ── State ──
+let wHist = Array(20).fill(0);
+let watchId = null, tracking = false;
+let myLat = null, myLng = null;
+let autoNavActive = false, autoNavInterval = null, navLoopCount = 0;
+let navLine = null;
+let currentPage = 'page-splash';
+let orderData = { product: null, productName: '', productIcon: '', weight: 0, pricePerKg: '' };
+
+// ── Page Navigation ──
+function goToPage(id, back=false) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active','back-in'));
+  const pg = document.getElementById(id);
+  if(back) pg.classList.add('back-in');
+  pg.classList.add('active');
+  currentPage = id;
+  syncAllESPStatus();
+  if(id === 'page-tracking') {
+    // Must wait for the page to be visible before init/invalidate
+    requestAnimationFrame(()=>{
+      setTimeout(()=>{
+        if(!trackMapInit) initTrackMap();
+        else if(trackMap) trackMap.invalidateSize();
+      }, 50);
+    });
+  }
+}
+
+// ── i18n ──
+const TR={
+  en:{
+    orderHd:'🛒 Place Your Order',orderSub:'Select your crop product and quantity',
+    locTitle:'Connect Your Location',locSub:'Enable GPS so the cart can navigate to you automatically',
+    locBtn:'Start My Location',locBtnStop:'Stop Tracking',
+    locWaiting:'Location not started',locSearching:'Searching for your location…',
+    locFound:'✅ Your location is live!',locDenied:'❌ Location denied — allow in browser settings',locErr:'❌ Location error — try again',
+    fwd:'Fwd',bwd:'Back',left:'Left',right:'Right',stop:'Stop',
+    espConn:'ESP32 Connected',espOff:'ESP32 Offline',espConn2:'Connecting…',
+    loaded:v=>`${v} g loaded`,refreshed:'ESP32 refreshed',
+    sending:c=>`→ /${c}`,sent:c=>`✓ ${c} sent`,failed:m=>`✗ ${m}`
+  },
+  ta:{
+    orderHd:'🛒 ஆர்டர் செய்யுங்கள்',orderSub:'தயாரிப்பு மற்றும் எடையை தேர்ந்தெடுங்கள்',
+    locTitle:'உங்கள் இடம் இணைக்கவும்',locSub:'வண்டி உங்களிடம் வர GPS இயக்கவும்',
+    locBtn:'என் இடம் தொடங்கு',locBtnStop:'நிறுத்து',
+    locWaiting:'இடம் தொடங்கவில்லை',locSearching:'உங்கள் இடம் தேடுகிறது…',
+    locFound:'✅ உங்கள் இடம் நேரடியாக!',locDenied:'❌ இடம் மறுக்கப்பட்டது',locErr:'❌ இடப் பிழை',
+    fwd:'முன்',bwd:'பின்',left:'இடது',right:'வலது',stop:'நிறுத்து',
+    espConn:'ESP32 இணைந்தது',espOff:'ESP32 இல்லை',espConn2:'இணைக்கிறது…',
+    loaded:v=>`${v} கி`,refreshed:'புதுப்பிக்கப்பட்டது',
+    sending:c=>`→ /${c}`,sent:c=>`✓ ${c}`,failed:m=>`✗ ${m}`
+  },
+  hi:{
+    orderHd:'🛒 ऑर्डर करें',orderSub:'फसल और वजन चुनें',
+    locTitle:'अपना स्थान जोड़ें',locSub:'कार्ट आप तक आने के लिए GPS चालू करें',
+    locBtn:'मेरा स्थान शुरू करें',locBtnStop:'ट्रैकिंग बंद करें',
+    locWaiting:'स्थान शुरू नहीं',locSearching:'आपका स्थान खोज रहा है…',
+    locFound:'✅ आपका स्थान लाइव है!',locDenied:'❌ स्थान अस्वीकार',locErr:'❌ स्थान त्रुटि',
+    fwd:'आगे',bwd:'पीछे',left:'बाएं',right:'दाएं',stop:'रुको',
+    espConn:'ESP32 जुड़ा हुआ',espOff:'ESP32 ऑफलाइन',espConn2:'जोड़ रहा है…',
+    loaded:v=>`${v} ग्रा`,refreshed:'अपडेट',
+    sending:c=>`→ /${c}`,sent:c=>`✓ ${c}`,failed:m=>`✗ ${m}`
+  }
+};
+let lang = 'en';
+function setLang(l) {
+  lang = l;
+  document.querySelectorAll('.lp').forEach((b,i)=>b.classList.toggle('on',['en','ta','hi'][i]===l));
+  const s = TR[l];
+  const set = (id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('t-order-hd',s.orderHd); set('t-order-sub',s.orderSub);
+  set('t-loc-title',s.locTitle); set('t-loc-sub',s.locSub);
+  set('t-locbtn', tracking ? s.locBtnStop : s.locBtn);
+  set('t-fwd',s.fwd); set('t-bwd',s.bwd); set('t-left',s.left);
+  set('t-right',s.right); set('t-stop',s.stop);
+}
+
+// ── Product Selection ──
+let selProduct = null, selWeight = 0;
+function selectProduct(id, icon, name, desc, price) {
+  document.querySelectorAll('.product-item').forEach(el=>el.classList.remove('selected'));
+  document.querySelectorAll('.prod-check').forEach(el=>{el.style.background='';el.style.borderColor='';el.style.color='';});
+  document.getElementById('prod-'+id).classList.add('selected');
+  selProduct = {id, icon, name, desc, price};
+  orderData.product = id; orderData.productName = name; orderData.productIcon = icon; orderData.pricePerKg = price;
+  document.getElementById('sum-product').textContent = icon + ' ' + name;
+  document.getElementById('sum-pricepkg').textContent = price;
+  updateTotal();
+}
+function selectWeight(g) {
+  document.querySelectorAll('.wchip').forEach(el=>el.classList.remove('sel'));
+  const el = document.getElementById('wc-'+g);
+  if(el) el.classList.add('sel');
+  selWeight = g; orderData.weight = g;
+  document.getElementById('sum-weight').textContent = g >= 1000 ? (g/1000)+'kg' : g+'g';
+  document.getElementById('customWeightInput').value = '';
+  updateTotal();
+}
+function onCustomWeight(v) {
+  const n = Math.min(Math.max(parseInt(v)||0,0),1000);
+  document.querySelectorAll('.wchip').forEach(el=>el.classList.remove('sel'));
+  selWeight = n; orderData.weight = n;
+  document.getElementById('sum-weight').textContent = n ? (n >= 1000 ? (n/1000)+'kg' : n+'g') : '—';
+  updateTotal();
+}
+function updateTotal() {
+  const btn = document.getElementById('placeOrderBtn');
+  if(selProduct && selWeight > 0) {
+    const priceNum = parseFloat(selProduct.price.replace('₹',''));
+    const total = (priceNum * selWeight / 1000).toFixed(2);
+    document.getElementById('sum-total').textContent = '₹' + total;
+    btn.disabled = false;
+  } else {
+    document.getElementById('sum-total').textContent = '—';
+    btn.disabled = true;
+  }
+}
+function placeOrder() {
+  if(!selProduct || !selWeight) return;
+  addLog(`🛒 Order: ${orderData.productIcon} ${orderData.productName} ${orderData.weight}g`, 'c');
+  goToPage('page-location');
+}
+
+// ── GPS / Location ──
+function toggleGPS(){if(tracking){stopGPS();}else{startGPS();}}
+function startGPS() {
+  if(!navigator.geolocation){setLocStatus('error',TR[lang].locDenied);return;}
+  setLocStatus('searching',TR[lang].locSearching);
+  document.getElementById('locTrackBtn').style.background='linear-gradient(135deg,#c8860a,#f59e0b)';
+  document.getElementById('locTrackIcon').textContent='⏳';
+  document.getElementById('t-locbtn').textContent = TR[lang].locSearching;
+  addLog(TR[lang].locSearching,'b');
+  watchId = navigator.geolocation.watchPosition(
+    pos=>{
+      tracking=true;
+      const {latitude:lat,longitude:lng,accuracy:acc}=pos.coords;
+      myLat=lat; myLng=lng;
+      setLocStatus('found',TR[lang].locFound);
+      document.getElementById('locTrackBtn').style.background='linear-gradient(135deg,#d94f4f,#f87171)';
+      document.getElementById('locTrackIcon').textContent='🔴';
+      document.getElementById('t-locbtn').textContent=TR[lang].locBtnStop;
+      document.getElementById('locCoordsBox').classList.add('show');
+      document.getElementById('locLatVal').textContent=lat.toFixed(6);
+      document.getElementById('locLngVal').textContent=lng.toFixed(6);
+      document.getElementById('locAccVal').textContent='±'+Math.round(acc)+' m';
+      document.getElementById('locNextBtn').disabled=false;
+      document.getElementById('gpsChip4').style.display='flex';
+      updateMapMyLocation(lat,lng,acc);
+      updateNavPrereq();
+      addLog(`📍 ${lat.toFixed(5)}, ${lng.toFixed(5)} ±${Math.round(acc)}m`,'b');
+    },
+    err=>{
+      tracking=false;
+      const msg=err.code===1?TR[lang].locDenied:TR[lang].locErr;
+      setLocStatus('error',msg);
+      document.getElementById('locTrackBtn').style.background='linear-gradient(135deg,#d94f4f,#f87171)';
+      document.getElementById('locTrackIcon').textContent='❌';
+      document.getElementById('t-locbtn').textContent=TR[lang].locBtn;
+      addLog(msg,'e');
+    },
+    {enableHighAccuracy:true,maximumAge:2000,timeout:15000}
+  );
+}
+function stopGPS(){
+  if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+  tracking=false; myLat=null; myLng=null;
+  if(autoNavActive) stopAutoNav();
+  if(meMarker){trackMap.removeLayer(meMarker);meMarker=null;}
+  myPoly.setLatLngs([]);myTrail=[];
+  document.getElementById('locTrackBtn').style.background='';
+  document.getElementById('locTrackIcon').textContent='📍';
+  document.getElementById('t-locbtn').textContent=TR[lang].locBtn;
+  document.getElementById('locCoordsBox').classList.remove('show');
+  document.getElementById('locNextBtn').disabled=true;
+  document.getElementById('gpsChip4').style.display='none';
+  setLocStatus('idle',TR[lang].locWaiting);
+  updateNavPrereq();
+}
+function setLocStatus(state,msg){
+  const dot=document.getElementById('locStatusDot');
+  const txt=document.getElementById('locStatusTxt');
+  dot.className='loc-status-dot'+(state==='found'?' tracking':state==='error'?' error':'');
+  txt.className='loc-status-txt'+(state==='error'?' error':'');
+  txt.textContent=msg;
+  if(state==='found') document.getElementById('locIconRing').textContent='✅';
+  else if(state==='error') document.getElementById('locIconRing').textContent='❌';
+  else document.getElementById('locIconRing').textContent='📍';
+}
+
+// ── MAP ──
+let trackMap=null, trackMapInit=false;
+let meMarker=null,myTrail=[],myPoly=null;
+let espMarker=null,espTrail=[],espPoly=null;
+const meIcon=L.divIcon({className:'',html:`<div style="width:20px;height:20px;background:#1a6eb5;border:3px solid white;border-radius:50%;box-shadow:0 0 12px rgba(26,110,181,.9);"></div>`,iconSize:[20,20],iconAnchor:[10,10]});
+const espIcon=L.divIcon({className:'',html:`<div style="width:22px;height:22px;background:#3a9e4a;border:3px solid #fff;border-radius:50%;box-shadow:0 0 14px rgba(58,158,74,.9);"></div>`,iconSize:[22,22],iconAnchor:[11,11]});
+
+function initTrackMap() {
+  if(trackMapInit) return;
+  trackMapInit = true;
+  trackMap = L.map('trackMap',{zoomControl:true,attributionControl:false}).setView([11.0,78.0],6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(trackMap);
+  myPoly = L.polyline([],{color:'#1a6eb5',weight:3,opacity:.5,dashArray:'6 5'}).addTo(trackMap);
+  espPoly = L.polyline([],{color:'#3a9e4a',weight:2,opacity:.4,dashArray:'4 4'}).addTo(trackMap);
+  if(myLat && myLng) updateMapMyLocation(myLat,myLng,0);
+}
+
+function updateMapMyLocation(lat,lng,acc){
+  if(!trackMapInit) return;
+  const ll=[lat,lng];
+  if(!meMarker) meMarker=L.marker(ll,{icon:meIcon}).bindTooltip('📱 You',{permanent:false,direction:'top'}).addTo(trackMap);
+  else meMarker.setLatLng(ll);
+  myTrail.push(ll);if(myTrail.length>100)myTrail.shift();
+  myPoly.setLatLngs(myTrail);
+  document.getElementById('hMyLoc4').textContent=`${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  document.getElementById('myLocHud4').style.display='block';
+  trackMap.panTo(ll,{animate:true,duration:1});
+}
+
+function updateEspMarker(lat,lng){
+  if(!trackMapInit || (lat===0 && lng===0)) return;
+  const ll=[lat,lng];
+  if(!espMarker) espMarker=L.marker(ll,{icon:espIcon}).bindTooltip('🛒 AgriMove Cart',{permanent:false,direction:'top'}).addTo(trackMap);
+  else espMarker.setLatLng(ll);
+  espTrail.push(ll);if(espTrail.length>200)espTrail.shift();
+  espPoly.setLatLngs(espTrail);
+  document.getElementById('hEspGps4').textContent=`${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  document.getElementById('espGpsHud4').style.display='block';
+}
+
+// ── Weight Gauge ──
+function setGauge(val){
+  const pct=Math.min(Math.max(val/MAX_WT,0),1);
+  document.getElementById('gBar').style.width=(pct*100)+'%';
+  document.getElementById('gBar').style.background=pct>.8?'linear-gradient(90deg,#d94f4f,#f9a8a8)':pct>.6?'linear-gradient(90deg,#c8860a,#fcd34d)':'linear-gradient(90deg,#52c464,#3a9e4a)';
+  document.getElementById('gNum').textContent=val.toFixed(2);
+  document.getElementById('hWt4').textContent=val.toFixed(2)+' g';
+}
+let wHist2=Array(20).fill(0);
+function updateChart(val){
+  wHist2.push(val);wHist2.shift();
+  const c=document.getElementById('miniChart');
+  const mx=Math.max(...wHist2,1);
+  c.innerHTML=wHist2.map(v=>`<div class="bar" style="height:${Math.round((v/mx)*34)+2}px;opacity:${.35+.65*(v/mx)}"></div>`).join('');
+}
+
+// ── Logging ──
+function addLog(msg,t=''){
+  ['logBox','navLogBox'].forEach(id=>{
+    const box=document.getElementById(id);
+    if(!box) return;
+    const ts=new Date().toTimeString().slice(0,8);
+    const r=document.createElement('div');r.className='lr';
+    r.innerHTML=`<span class="lt">${ts}</span><span class="lm ${t}">${msg}</span>`;
+    box.prepend(r);while(box.children.length>30)box.removeChild(box.lastChild);
+  });
+}
+
+// ── ESP Status ──
+function setESPStatus(s){
+  const label = TR[lang][s==='live'?'espConn':s==='dead'?'espOff':'espConn2'];
+  const cls = s==='live'?' live':s==='dead'?' dead':'';
+  ['espDot2','espDot3','espDot4','espDot5'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.className='dot'+cls;
+  });
+  ['espTxt2','espTxt3','espTxt4','espTxt5'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.textContent=label;
+  });
+  const connDot=document.getElementById('espConnDot');
+  if(connDot) connDot.className='conn-dot'+(s==='live'?' on':s==='dead'?' off':'');
+  const connSub=document.getElementById('esp32ConnSub');
+  if(connSub) connSub.textContent=label;
+  updateNavPrereq();
+}
+function syncAllESPStatus(){}
+
+// ── Fetch ESP32 ──
+async function fetchESP(){
+  try{
+    const r=await fetch(ESP+'/data',{signal:AbortSignal.timeout(4000)});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const data=await r.json();
+    setESPStatus('live');
+    const wt=parseFloat(data.weight)||0;
+    setGauge(wt);updateChart(wt);
+    const lat=parseFloat(data.lat)||0;
+    const lng=parseFloat(data.lng)||0;
+    const gpsValid=data.gps_valid!==false&&(lat!==0||lng!==0);
+    if(document.getElementById('espLatVal4')) document.getElementById('espLatVal4').textContent=lat?lat.toFixed(6):'No fix';
+    if(document.getElementById('espLngVal4')) document.getElementById('espLngVal4').textContent=lng?lng.toFixed(6):'No fix';
+    if(document.getElementById('espGpsValid4')) document.getElementById('espGpsValid4').textContent=gpsValid?'✅ Fixed':'⏳ Searching';
+    if(document.getElementById('espCartStatus4')) document.getElementById('espCartStatus4').textContent=data.status||'idle';
+    if(gpsValid) updateEspMarker(lat,lng);
+    addLog(TR[lang].refreshed);
+  }catch(e){
+    setESPStatus('dead');
+    addLog(TR[lang].failed(e.message),'e');
+  }
+}
+
+// ── Motor Commands ──
+async function cmd(c){
+  const b=document.getElementById('btn-'+c);
+  b?.classList.add('hit');
+  addLog(TR[lang].sending(c),'c');
+  try{
+    const r=await fetch(ESP+'/'+c,{signal:AbortSignal.timeout(5000)});
+    if(r.ok){addLog(TR[lang].sent(c));setTimeout(fetchESP,600);}
+  }catch(e){
+    addLog(TR[lang].failed(e.message),'e');
+    setESPStatus('dead');
+  }
+  setTimeout(()=>b?.classList.remove('hit'),250);
+}
+document.addEventListener('keydown',e=>{
+  const m={ArrowUp:'forward',ArrowDown:'backward',ArrowLeft:'left',ArrowRight:'right',' ':'stop'};
+  if(m[e.key]){e.preventDefault();cmd(m[e.key]);}
+});
+
+// ── Haversine / Auto-Nav ──
+function haversineDistance(lat1,lng1,lat2,lng2){
+  const R=6371000;
+  const φ1=lat1*Math.PI/180,φ2=lat2*Math.PI/180;
+  const Δφ=(lat2-lat1)*Math.PI/180,Δλ=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(Δφ/2)**2+Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function calcBearing(lat1,lng1,lat2,lng2){
+  const φ1=lat1*Math.PI/180,φ2=lat2*Math.PI/180;
+  const Δλ=(lng2-lng1)*Math.PI/180;
+  const y=Math.sin(Δλ)*Math.cos(φ2);
+  const x=Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+  return ((Math.atan2(y,x)*180/Math.PI)+360)%360;
+}
+function bearingToCommand(b){
+  if(b<22.5||b>=337.5)return{cmd:'forward',label:'⬆️ Forward'};
+  if(b<67.5)return{cmd:'right',label:'↗️ Forward-Right'};
+  if(b<112.5)return{cmd:'right',label:'➡️ Right'};
+  if(b<157.5)return{cmd:'right',label:'↘️ Back-Right'};
+  if(b<202.5)return{cmd:'backward',label:'⬇️ Backward'};
+  if(b<247.5)return{cmd:'left',label:'↙️ Back-Left'};
+  if(b<292.5)return{cmd:'left',label:'⬅️ Left'};
+  return{cmd:'left',label:'↖️ Forward-Left'};
+}
+
+function setNavStatus(msg,state){
+  const dot=document.getElementById('navDot');
+  const txt=document.getElementById('navStatusTxt');
+  dot.className='nav-dot'+(state==='active'?' active':state==='arrived'?' arrived':'');
+  txt.textContent=msg;
+}
+function updateNavPrereq(){
+  const espOk=document.getElementById('espDot4')?.classList.contains('live');
+  const gpsOk=myLat!==null;
+  const prereq=document.getElementById('navPrereq');
+  const btn=document.getElementById('navBtn');
+  if(!gpsOk||!espOk){
+    if(prereq){prereq.style.display='flex';prereq.textContent=!gpsOk?'⚠️ Start Phone GPS first':'⚠️ ESP32 not connected';}
+    if(!autoNavActive&&btn) btn.disabled=true;
+  } else {
+    if(prereq) prereq.style.display='none';
+    if(!autoNavActive&&btn) btn.disabled=false;
+  }
+}
+
+async function navTick(){
+  if(!autoNavActive) return;
+  if(myLat===null){setNavStatus('⏳ Waiting for GPS…','active');return;}
+  let cartLat=null,cartLng=null;
+  try{
+    const r=await fetch(ESP+'/data',{signal:AbortSignal.timeout(3000)});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const data=await r.json();
+    const la=parseFloat(data.lat),ln=parseFloat(data.lng);
+    if(data.gps_valid!==false&&(la!==0||ln!==0)){cartLat=la;cartLng=ln;}
+  }catch(e){setNavStatus('⚠️ ESP32 unreachable','active');return;}
+  if(cartLat===null){setNavStatus('⏳ Waiting for cart GPS fix…','active');return;}
+  const dist=haversineDistance(cartLat,cartLng,myLat,myLng);
+  const bearing=calcBearing(cartLat,cartLng,myLat,myLng);
+  navLoopCount++;
+  document.getElementById('navDistance').textContent=dist.toFixed(1)+' m';
+  document.getElementById('navBearing').textContent=bearing.toFixed(1)+'°';
+  document.getElementById('navLoops').textContent=navLoopCount;
+  updateNavLine(cartLat,cartLng,myLat,myLng);
+  if(dist<=ARRIVED_THRESHOLD_M){
+    await fetch(ESP+'/stop',{signal:AbortSignal.timeout(3000)}).catch(()=>{});
+    setNavStatus('✅ Arrived! Cart stopped.','arrived');
+    document.getElementById('navDirection').textContent='✅ Stop';
+    addLog(`🎉 Arrived! Distance: ${dist.toFixed(2)} m`,'c');
+    stopAutoNav();
+    showArrivedPage(dist);
+    return;
+  }
+  const {cmd:navCmd,label}=bearingToCommand(bearing);
+  document.getElementById('navDirection').textContent=label;
+  setNavStatus(`Navigating → ${label} | ${dist.toFixed(1)} m away`,'active');
+  addLog(`🧭 dist:${dist.toFixed(1)}m bear:${bearing.toFixed(0)}° → ${navCmd}`,'b');
+  try{await fetch(ESP+'/'+navCmd,{signal:AbortSignal.timeout(3000)});}catch(e){addLog('🧭 Command failed: '+e.message,'e');}
+}
+
+function showArrivedPage(dist) {
+  document.getElementById('arr-product').textContent = orderData.productIcon + ' ' + orderData.productName;
+  document.getElementById('arr-weight').textContent = orderData.weight + ' g';
+  document.getElementById('arr-distance').textContent = dist ? dist.toFixed(2) + ' m' : '< 2 m';
+  document.getElementById('arr-loops').textContent = navLoopCount;
+  document.getElementById('arr-accuracy').textContent = '≤ ' + ARRIVED_THRESHOLD_M + ' m';
+  goToPage('page-arrived');
+  launchConfetti();
+  vaSpeak('Cart reached your destination successfully!','வண்டி வெற்றிகரமாக வந்தது!','कार्ट सफलतापूर्वक पहुंच गई!');
+}
+
+function startNewOrder() {
+  selProduct=null; selWeight=0; orderData={product:null,productName:'',productIcon:'',weight:0,pricePerKg:''};
+  document.querySelectorAll('.product-item').forEach(el=>el.classList.remove('selected'));
+  document.querySelectorAll('.wchip').forEach(el=>el.classList.remove('sel'));
+  document.getElementById('sum-product').textContent='—';
+  document.getElementById('sum-weight').textContent='—';
+  document.getElementById('sum-pricepkg').textContent='—';
+  document.getElementById('sum-total').textContent='—';
+  document.getElementById('placeOrderBtn').disabled=true;
+  navLoopCount=0;
+  goToPage('page-order');
+}
+
+function updateNavLine(lat1,lng1,lat2,lng2){
+  if(!trackMapInit) return;
+  if(!navLine) navLine=L.polyline([[lat1,lng1],[lat2,lng2]],{color:'#c8860a',weight:2.5,opacity:.7,dashArray:'6 4'}).addTo(trackMap);
+  else navLine.setLatLngs([[lat1,lng1],[lat2,lng2]]);
+}
+function clearNavLine(){if(navLine&&trackMapInit){trackMap.removeLayer(navLine);navLine=null;}}
+
+function toggleAutoNav(){if(autoNavActive){stopAutoNav();}else{startAutoNav();}}
+function startAutoNav(){
+  if(myLat===null){addLog('🧭 Start phone GPS first','e');return;}
+  autoNavActive=true;navLoopCount=0;
+  document.getElementById('navBtn').className='big-btn amber-btn';
+  document.getElementById('navBtn').textContent='⏹ Stop Auto-Navigation';
+  setNavStatus('🚀 Auto-nav started…','active');
+  addLog('🧭 Auto-navigation STARTED','c');
+  navTick();
+  autoNavInterval=setInterval(navTick,1000);
+}
+function stopAutoNav(){
+  autoNavActive=false;clearInterval(autoNavInterval);autoNavInterval=null;clearNavLine();
+  document.getElementById('navBtn').className='big-btn amber-btn';
+  document.getElementById('navBtn').textContent='🧭 Start Auto-Navigation';
+  setNavStatus('Auto-nav stopped','');
+  fetch(ESP+'/stop',{signal:AbortSignal.timeout(3000)}).catch(()=>{});
+  addLog('🧭 Auto-navigation STOPPED','e');
+}
+
+// ── Confetti ──
+function launchConfetti() {
+  const container = document.getElementById('arrivedConfetti');
+  container.innerHTML = '';
+  const colors = ['#52c464','#3a9e4a','#f59e0b','#fff','#7ee88a','#fcd34d'];
+  for(let i=0;i<60;i++){
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.cssText = `left:${Math.random()*100}%;background:${colors[Math.floor(Math.random()*colors.length)]};animation-duration:${2+Math.random()*3}s;animation-delay:${Math.random()*2}s;transform:rotate(${Math.random()*360}deg);width:${6+Math.random()*10}px;height:${6+Math.random()*10}px;border-radius:${Math.random()>0.5?'50%':'2px'};`;
+    container.appendChild(piece);
+  }
+}
+
+// ════════════════════════════════════════════════
+// 🎙️ VOICE ASSISTANT
+// ════════════════════════════════════════════════
+let vaRecog=null,vaListening=false,vaLang='en-IN',waveAnim=null;
+const VA_COMMANDS=[
+  {kw:{en:['forward','go','move','ahead'],ta:['முன்','முன்னே','செல்'],hi:['आगे','चलो','जाओ']},fn:()=>cmd('forward'),reply:{en:'Moving forward 🚜',ta:'முன்னே செல்கிறது 🚜',hi:'आगे बढ़ रहा है 🚜'}},
+  {kw:{en:['back','backward','reverse'],ta:['பின்','பின்னே'],hi:['पीछे','उल्टा']},fn:()=>cmd('backward'),reply:{en:'Reversing 🔙',ta:'பின்னே செல்கிறது 🔙',hi:'पीछे जा रहा है 🔙'}},
+  {kw:{en:['left','turn left'],ta:['இடது'],hi:['बाएं','लेफ्ट']},fn:()=>cmd('left'),reply:{en:'Turning left ↰',ta:'இடது திரும்புகிறது ↰',hi:'बाएं मुड़ रहा है ↰'}},
+  {kw:{en:['right','turn right'],ta:['வலது'],hi:['दाएं','राइट']},fn:()=>cmd('right'),reply:{en:'Turning right ↱',ta:'வலது திரும்புகிறது ↱',hi:'दाएं मुड़ रहा है ↱'}},
+  {kw:{en:['stop','halt','brake','emergency'],ta:['நிறுத்து','நில்'],hi:['रुको','रुक','बंद']},fn:()=>cmd('stop'),reply:{en:'Bot stopped ■',ta:'நிறுத்தப்பட்டது ■',hi:'बॉट रुक गया ■'}},
+  {kw:{en:['start gps','start location','track me','my location'],ta:['இடம் தொடங்கு','இடம்'],hi:['लोकेशन शुरू','मेरा स्थान']},fn:()=>{if(!tracking)startGPS();},reply:{en:'Starting GPS 📍',ta:'இடம் தொடங்குகிறது 📍',hi:'GPS शुरू 📍'}},
+  {kw:{en:['stop gps','stop location','stop tracking'],ta:['இடம் நிறுத்து'],hi:['लोकेशन बंद','GPS बंद']},fn:()=>{if(tracking)stopGPS();},reply:{en:'GPS stopped',ta:'இடம் நிறுத்தப்பட்டது',hi:'GPS बंद'}},
+  {kw:{en:['weight','how much','load','how heavy'],ta:['எடை','எத்தனை'],hi:['वजन','कितना']},fn:()=>{const w=parseFloat(document.getElementById('gNum').textContent)||0;vaSpeak(`Weight is ${w.toFixed(2)} grams`,`எடை ${w.toFixed(2)} கிராம்`,`वजन ${w.toFixed(2)} ग्राम`);},reply:{en:'Checking weight ⚖️',ta:'எடை பார்க்கிறது ⚖️',hi:'वजन देख रहा है ⚖️'},noSpeak:true},
+  {kw:{en:['status','connection'],ta:['நிலை','இணைப்பு'],hi:['स्थिति','कनेक्शन']},fn:()=>fetchESP(),reply:{en:'Refreshing status 🔄',ta:'நிலை புதுப்பிக்கிறது 🔄',hi:'स्थिति अपडेट 🔄'}},
+  {kw:{en:['auto navigate','navigate to me','follow me','auto nav'],ta:['தானியங்கி','என்னை பின்தொடர்'],hi:['ऑटो नेवीगेट','मेरे पास आओ']},fn:()=>{if(!autoNavActive)startAutoNav();},reply:{en:'Auto-navigation started 🧭',ta:'தானியங்கி தொடங்கியது 🧭',hi:'ऑटो नेवीगेशन शुरू 🧭'}},
+  {kw:{en:['stop navigation','stop nav','cancel nav'],ta:['நேவிகேஷன் நிறுத்து'],hi:['नेवीगेशन बंद']},fn:()=>{if(autoNavActive)stopAutoNav();},reply:{en:'Auto-navigation stopped ⏹',ta:'நேவிகேஷன் நிறுத்தப்பட்டது ⏹',hi:'नेवीगेशन बंद ⏹'}},
+  {kw:{en:['order','place order'],ta:['ஆர்டர்','ஆர்டர் செய்'],hi:['ऑर्डर','ऑर्डर करो']},fn:()=>goToPage('page-order'),reply:{en:'Opening Order page 🛒',ta:'ஆர்டர் பக்கம் திறக்கிறது 🛒',hi:'ऑर्डर पेज खुल रहा है 🛒'}},
+  {kw:{en:['map','tracking','track'],ta:['வரைபடம்','கண்காணிப்பு'],hi:['मैप','ट्रैकिंग']},fn:()=>goToPage('page-tracking'),reply:{en:'Opening map 🗺️',ta:'வரைபடம் திறக்கிறது 🗺️',hi:'मैप खुल रहा है 🗺️'}},
+];
+const VA_HINTS={'en-IN':['Go forward','Turn left','Stop','My location','Check weight','Open map'],'ta-IN':['முன்னே செல்','இடது','நிறுத்து','இடம் காட்டு','எடை','வரைபடம்'],'hi-IN':['आगे जाओ','बाएं','रुको','मेरा स्थान','वजन','मैप']};
+
+function vaInitRecog(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){vaShowResult('❌ Speech recognition not supported. Use Chrome.');return false;}
+  vaRecog=new SR();vaRecog.continuous=false;vaRecog.interimResults=true;vaRecog.lang=vaLang;
+  vaRecog.onstart=()=>{vaListening=true;vaSetStatus('🔴 Listening…');document.getElementById('vaMicBtn').classList.add('active');document.getElementById('vaMicTxt').textContent='Listening…';document.getElementById('vaFab').classList.add('listening');vaStartWave();vaSetTranscript('<em>Listening…</em>');};
+  vaRecog.onresult=e=>{let interim='',final='';for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)final+=t;else interim+=t;}vaSetTranscript(final||interim);if(final)vaProcess(final.toLowerCase().trim());};
+  vaRecog.onerror=e=>{vaStopListening();const msgs={'not-allowed':'❌ Mic permission denied.','no-speech':'🔇 No speech detected.','network':'📡 Network error.'};vaShowResult(msgs[e.error]||'❌ Error: '+e.error);vaSetStatus('Error — tap to retry');addLog('🎙️ Voice error: '+e.error,'e');};
+  vaRecog.onend=()=>{vaStopListening();};
+  return true;
+}
+function vaProcess(text){
+  addLog('🎙️ "'+text+'"','b');
+  const curLangKey=vaLang.startsWith('ta')?'ta':vaLang.startsWith('hi')?'hi':'en';
+  let matched=false;
+  for(const c of VA_COMMANDS){
+    const kws=c.kw[curLangKey]||c.kw['en'];
+    if(kws.some(k=>text.includes(k))){
+      matched=true;
+      const replyTxt=c.reply[curLangKey]||c.reply['en'];
+      vaShowResult('✅ '+replyTxt);
+      if(!c.noSpeak)vaSpeak(c.reply.en,c.reply.ta,c.reply.hi);
+      c.fn();break;
+    }
+  }
+  if(!matched){vaShowResult('🤔 Not understood. Try: forward, stop, weight, map…');vaSpeak("Sorry, I didn't understand","புரியவில்லை","समझ नहीं आया");addLog('🎙️ No match: "'+text+'"','e');}
+}
+function vaSpeak(en,ta,hi){
+  if(!window.speechSynthesis) return;
+  const langMap={'en-IN':en,'ta-IN':ta,'hi-IN':hi};
+  const txt=langMap[vaLang]||en;
+  const u=new SpeechSynthesisUtterance(txt);u.lang=vaLang;u.rate=1.0;u.pitch=1.1;
+  window.speechSynthesis.cancel();window.speechSynthesis.speak(u);
+}
+function vaToggleMic(){
+  if(vaListening){vaRecog?.stop();return;}
+  if(!vaRecog&&!vaInitRecog())return;
+  vaRecog.lang=vaLang;
+  try{vaRecog.start();}catch(e){vaInitRecog();setTimeout(()=>vaRecog?.start(),200);}
+}
+function vaStopListening(){
+  vaListening=false;vaStopWave();
+  document.getElementById('vaMicBtn').classList.remove('active');
+  document.getElementById('vaMicTxt').textContent='Hold & Speak';
+  document.getElementById('vaFab').classList.remove('listening');
+  vaSetStatus('Ready — tap mic to speak');
+}
+function vaTogglePanel(){const p=document.getElementById('vaPanel');p.classList.toggle('open');if(p.classList.contains('open'))vaRenderHints();}
+function vaSetLang(l){vaLang=l;document.querySelectorAll('.va-lb').forEach((b,i)=>b.classList.toggle('on',['en-IN','ta-IN','hi-IN'][i]===l));if(vaRecog)vaRecog.lang=l;vaRenderHints();}
+function vaRenderHints(){const hints=VA_HINTS[vaLang]||VA_HINTS['en-IN'];document.getElementById('vaHints').innerHTML=hints.map(h=>`<span class="va-hint" onclick="vaRunHint('${h}')">${h}</span>`).join('');}
+function vaRunHint(txt){vaSetTranscript(txt);vaProcess(txt.toLowerCase());}
+function vaSetStatus(s){document.getElementById('vaHeadStatus').textContent=s;}
+function vaSetTranscript(t){document.getElementById('vaTranscript').innerHTML=t;}
+function vaShowResult(t){const r=document.getElementById('vaResult');r.textContent=t;r.classList.add('show');clearTimeout(r._tid);r._tid=setTimeout(()=>r.classList.remove('show'),5000);}
+function vaStartWave(){const bars=[...document.querySelectorAll('.va-bar')];bars.forEach(b=>b.classList.add('active'));waveAnim=setInterval(()=>{bars.forEach(b=>{b.style.height=(4+Math.random()*26)+'px';});},120);}
+function vaStopWave(){clearInterval(waveAnim);document.querySelectorAll('.va-bar').forEach(b=>{b.classList.remove('active');b.style.height='6px';});}
+
+// ── Boot ──
+setLang('en');
+setESPStatus('connecting');
+setLocStatus('idle','Location not started');
+fetchESP();
+setInterval(fetchESP,1000);
+updateNavPrereq();
+</script>
+</body>
+</html>
